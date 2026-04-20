@@ -3,7 +3,7 @@
 ## FortiClient ZTNA
 
 FortiClient on Linux doesn't create a tunnel interface (`tun0`). Instead it:
-1. Adds a secondary IP (e.g. `10.167.32.7/32`) to the physical interface
+1. Adds a secondary IP (e.g. `10.167.32.42/32`) to the physical interface
 2. Adds routes for corporate subnets with that IP as the source
 3. Intercepts packets sourced from that IP via kernel hooks and tunnels them over DTLS/HTTPS to the FortiGate gateway
 4. Runs `fctdns` on `127.0.0.1:53` to intercept DNS and forward to corporate DNS servers
@@ -14,7 +14,10 @@ ip addr show enp0s31f6 | grep 10.167       # VPN IP assigned?
 ip route | grep 10.167                       # Routes in place?
 nc -zw2 10.169.2.54 53                       # Corporate DNS reachable?
 dig @127.0.0.1 <internal-hostname>           # DNS resolution working?
+nc -zw5 <internal-host> 22                   # SSH port reachable?
 ```
+
+The VPN IP (e.g. `10.167.32.x`) changes on each reconnect. If forwarding to another machine stops working after a VPN reconnect, re-run `sudo bash ~/route.sh` — it now detects the current IP automatically.
 
 ### Known issue: DNS on connection
 FortiClient may fail to connect with "IPsec VPN failed" if DNS is not resolving correctly on the current network. Verify DNS is working before attempting to connect.
@@ -35,8 +38,10 @@ sudo bash ~/route.sh
 ```
 
 `route.sh` adds:
-- SNAT rules to rewrite forwarded traffic source to the VPN IP (`10.167.32.7`)
+- SNAT rules to rewrite forwarded traffic source to the current VPN IP (auto-detected from `enp0s31f6`)
 - TCP MSS clamping to 1130 to avoid MTU black holes on the VPN path
+
+**Note:** The VPN IP changes on each reconnect. `route.sh` now detects it dynamically, so re-running it after reconnect is sufficient. It also cleans up any stale rules from previous runs before adding new ones.
 
 ### Setup (other machine)
 ```bash
